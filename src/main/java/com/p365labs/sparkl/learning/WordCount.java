@@ -14,6 +14,8 @@ import java.util.Arrays;
 
 /**
  * Created by federicopanini on 31/05/16.
+ *
+ * In this script a simple map/reduce is implemented to do a wordcount on a text file
  */
 public class WordCount implements Serializable {
 
@@ -35,7 +37,7 @@ public class WordCount implements Serializable {
         JavaRDD<String> words = file.flatMap(
                 new FlatMapFunction<String, String>() {
                     public Iterable<String> call(String s) throws Exception {
-                        return Arrays.asList(s.split(" "));
+                        return Arrays.asList(s.split("\\W+"));
                     }
                 }
 
@@ -44,7 +46,7 @@ public class WordCount implements Serializable {
         JavaPairRDD<String, Integer> counts = words.mapToPair(
                 new PairFunction<String, String, Integer>() {
                     public Tuple2<String, Integer> call(String s) throws Exception {
-                        return new Tuple2<String, Integer>(s, 1);
+                        return new Tuple2<String, Integer>(s.toLowerCase(), 1);
                     }
                 }
         ).reduceByKey(new Function2<Integer, Integer, Integer>() {
@@ -53,7 +55,22 @@ public class WordCount implements Serializable {
             }
         });
 
-        JavaPairRDD countOrdered = counts.sortByKey(true, 1);
-        countOrdered.saveAsTextFile(outputfile);
+        JavaPairRDD<Integer, String> wordCounts = counts.mapToPair(
+            new PairFunction<Tuple2<String, Integer>, Integer, String>() {
+                public Tuple2<Integer, String> call(Tuple2<String, Integer> item) throws Exception {
+                    return item.swap();
+            }
+        });
+
+        JavaPairRDD countOrdered = wordCounts.sortByKey(false);
+
+        JavaPairRDD<Integer, String> wordCountsReverse = countOrdered.mapToPair(
+                new PairFunction<Tuple2<String, Integer>, Integer, String>() {
+                    public Tuple2<Integer, String> call(Tuple2<String, Integer> item) throws Exception {
+                        return item.swap();
+                    }
+                });
+
+        wordCountsReverse.saveAsTextFile(outputfile);
     }
 }
